@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	
+<mapper namespace="com.hotels.springboot.resthotel.IHotelService">
+	<!-- 각 페이지의 목록 반환 -->
+	<!-- <select id="list"
+		parameterType="com.hotels.springboot.resthotel.ParameterDTO"
+		resultType="com.hotels.springboot.resthotel.HotelDTO">
+		select * from (
+			select tb.*, rownum rNum from (
+				select * from hotel inner join 
+                (select min(price) price, hotel_idx from room group by hotel_idx) 
+				using(hotel_idx) order by price desc
+			) tb
+		)
+		where rNum between #{start} and #{end}
+	</select> -->
+	
+	<!-- 호텔 검색하기 -->
+	<select id="search"
+		parameterType="com.hotels.springboot.resthotel.ParameterDTO"
+		resultType="com.hotels.springboot.resthotel.HotelDTO">
+		select * from (
+		    select h.*, nvl(grade, 0) grade, p.price, nvl(s.total_comment, 0) total_comment , 
+		        trunc(to_number(DISTANCE_WGS84(#{ht_lat}, #{ht_lng}, h.ht_lat, h.ht_lng)),3) AS disKM  
+		                from hotel h
+		                inner join (select * from hotel 
+		                    inner join (select min(price) price, hotel_idx from room group by hotel_idx) 
+		                        using(hotel_idx) 
+			                      <if test="searchWord != null">
+				                    where 
+									country like '%'||#{searchWord}||'%' 
+									or city like '%'||#{searchWord}||'%' 
+									or province like '%'||#{searchWord}||'%' 
+									or street like '%'||#{searchWord}||'%'
+				                  </if>
+		                        ) p 
+		                    on p.hotel_idx = h.hotel_idx
+		                left outer join (select hotel_idx, avg(grade) grade, count(*) total_comment 
+		                    from (select c.hotel_idx, hotel, c.grade
+		                        from comments c
+		                            join hotel h on c.hotel_idx = h.hotel_idx) 
+		                    group by hotel_idx) s
+		                    on h.hotel_idx = s.hotel_idx
+		            where price between #{minPrice} and #{maxPrice}) where grade <![CDATA[>=]]> #{grade}
+	</select>
+	
+	<!-- 내용보기 -->
+	<select id="view"
+		parameterType="com.hotels.springboot.resthotel.ParameterDTO"
+		resultType="com.hotels.springboot.resthotel.HotelDTO">
+		<!-- select * from hotel where hotel_idx=#{hotel_idx} order by price -->
+		select * from hotel 
+			inner join room using(hotel_idx) 
+			where hotel_idx=#{hotel_idx} 
+			order by price
+	</select>
+	
+	<!-- 후기 -->
+	<select id="comment"
+		resultType="com.hotels.springboot.resthotel.HotelDTO">
+		select c.*, email, apple, naver, google, h.site 
+			from comments c 
+			    inner join member m on c.idx=m.idx  
+			    inner join hotel h on h.hotel_idx = c.hotel_idx
+		    where c.hotel_idx = #{hotel_idx} order by comment_date desc
+	</select>
+	
+	<!-- 평점 -->
+	<select id="getGrade"
+		parameterType="com.hotels.springboot.resthotel.ParameterDTO"
+		resultType="com.hotels.springboot.resthotel.HotelDTO">
+		select h.hotel_idx, hotel, s.grade from hotel h
+		    left outer join (select hotel_idx, avg(grade) grade from 
+			    (select c.hotel_idx, hotel, c.grade
+			        from comments c
+			            join hotel h on c.hotel_idx = h.hotel_idx) 
+		    	group by hotel_idx) s
+		    on h.hotel_idx = s.hotel_idx
+		    where h.hotel_idx = ${hotel_idx}
+		
+	</select>
+</mapper>
